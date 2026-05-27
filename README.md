@@ -97,7 +97,7 @@ CUDA_VISIBLE_DEVICES=0 python demo.py
 **Performance.** CogVLA achieves state-of-the-art performance with success rates of 97.4\% and 70.0\% on simulation and real-world tasks, respectively.
 
 <div align="center">
-<img src='assets/main-results2.png' width='100%'>
+<img src='assets/result.png' width='100%'>
 </div>
 
 **Efficiency.** CogVLA also reduces training costs by 2.5× and decreases inference latency by 2.8× compared to OpenVLA.
