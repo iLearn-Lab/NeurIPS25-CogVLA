@@ -131,7 +131,7 @@ If you find this work useful for your research, please kindly cite our paper.
 }
 ```
 
-[![Star History Chart](https://api.star-history.com/svg?repos=JiuTian-VL/CogVLA&Date)](https://www.star-history.com/#JiuTian-VL/CogVLA&Date)
+
 
 
 
