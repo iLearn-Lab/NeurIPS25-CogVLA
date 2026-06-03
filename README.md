@@ -58,6 +58,7 @@ The overall framework of CogVLA is illustrated below.
 <img src='assets/framework.png' width='100%'>
 </div>
 
+
 ## Installation
 
 ```bash
@@ -75,6 +76,8 @@ pip install packaging ninja
 ninja --version; echo $?  # Verify Ninja --> should return exit code "0"
 pip install "flash-attn==2.5.5" --no-build-isolation
 ```
+
+
 
 
 ## Training and Evaluation
@@ -117,6 +120,90 @@ The attention maps of CogVLA highlight task-relevant regions in the input image,
 https://github.com/user-attachments/assets/31a3616d-eecf-47e6-8bf6-cc5471dc1de4
 
 https://github.com/user-attachments/assets/67629cab-1175-40be-9250-7591d9b2b65c
+
+## Representative Issue
+
+Based on the following representative issue reported by the community, we analyze the potential sources of performance variability observed during CogVLA reproduction:
+
+> "Hello, this is excellent work, and I greatly appreciate your contributions to the field of embodied intelligence. However, when reproducing the paper, I found that during evaluation in the LIBERO simulation environment, certain task suites (particularly Spatial and Long) failed to achieve the performance reported in the paper. For each task suite, I followed the instructions in LIBERO.md and modified the parameters in `finetune.sh` accordingly, fine-tuning each model for 80,005 steps. I then merged the weights and evaluated the resulting policy on the same device/GPU used for training. The reproduction results are as follows:
+>
+> * LIBERO-Spatial: 91.6%
+> * LIBERO-Object: 98.2%
+> * LIBERO-Goal: 96.6%
+> * LIBERO-Long: 89.2%
+>
+> Reported results in the paper:
+>
+> * LIBERO-Spatial: 98.6%
+> * LIBERO-Object: 98.8%
+> * LIBERO-Goal: 96.6%
+> * LIBERO-Long: 95.4%"
+
+The reproduced average success rate is approximately 3.5% lower than that reported in the paper. To address this discrepancy, we recommend first considering the following factors:
+
+**(1)**
+As described in Appendix A, our models were trained for up to 60k steps. During training, we evaluated the model every 10k steps and ultimately reported the performance of the best-performing checkpoint rather than the final checkpoint. Consequently, the optimal performance may not necessarily correspond to the last training iteration (e.g., 80k steps), and evaluating only the final checkpoint may lead to suboptimal results.
+
+**(2)**
+In addition to training each LIBERO subset independently, we recommend performing joint training across all four LIBERO subsets. Following the same evaluation protocol described in (1), the best-performing checkpoint can then be selected from multiple evaluation stages. In our experience, joint training often provides a stronger and more stable optimization signal while significantly reducing overall training cost.
+
+**(3)**
+We observed that LIBERO evaluations exhibit non-negligible performance variance across different training runs, random seeds, and evaluation settings, particularly for aggressively compressed VLA architectures. Our observations indicate that such variance tends to become further amplified when the input representation is aggressively compressed. As a result, small differences in training dynamics, hardware configurations, numerical precision, or evaluation seeds can produce noticeable fluctuations in the final success rate.
+
+> (1) "Following your suggestion, I evaluated checkpoints every 10k steps from 40k to 80k. However, the best results I obtained were still:
+>
+> * LIBERO-Spatial: 92.8%
+> * LIBERO-Object: 98.4%
+> * LIBERO-Goal: 96.6%
+> * LIBERO-Long: 90.4%
+>
+> The Spatial and Long results remain significantly below those reported in the paper. What could be the reason?"
+>
+> (2) "Are the results reported in the paper obtained using joint training across all four subsets?"
+>
+> (3) "How can I mitigate the high variance of LIBERO? If the performance degradation originates from the simulation environment, does this imply that the method itself lacks robustness?"
+
+The reproduced average success rate in this case remains approximately 2.9% below our reported result. Based on our internal experiments, we provide the following detailed observations and practical recommendations (based on our previous experimental observations, the optimal checkpoint may vary across training runs). Relevant checkpoints will be released once the ongoing training runs are completed.
+
+**(1)**
+For the Spatial subset, we trained the model using 4 × A800 (80GB) GPUs following the configuration described in Appendix A. We obtained success rates of 98.4% and 98.6% at the 40k and 50k checkpoints, respectively. In contrast, later checkpoints achieved only 97.6% and 97.8%, suggesting that optimal performance occurs within a specific training window rather than monotonically improving with additional optimization steps.
+
+We also observed considerable sensitivity to random seeds. For example, changing the seed from 7 to 42 resulted in approximately 1.2% performance variation. Moreover, even under identical seeds, repeated evaluations may still yield slightly different success rates, as observed on LIBERO-Goal.
+
+**(2)**
+For the Object subset, the best-performing checkpoint was obtained at 30k steps, achieving 98.8% success rate.
+
+**(3)**
+For the Goal subset, we obtained 96.6% success rate at the 40k checkpoint. However, under the same random seed and training configuration, we have also observed evaluation results as low as 95.0%.
+
+**(4)**
+For the Long subset, we experimented with both independent training and joint training. The most effective training strategy was found to be:
+
+* Linear warmup: 2k steps
+* Initial learning rate: 5e-4
+* Cosine decay to 1e-8 over 80k steps
+
+Using this schedule, we achieved 95.4% success rate at the 60k checkpoint. We note that this optimization strategy may also benefit the other LIBERO subsets.
+
+**(5)**
+After conducting extensive experiments across all subsets, we found that joint training provides a substantially more efficient training paradigm. Within a total training budget of fewer than 80k steps, all four subsets can already approach their respective optimal performance levels, reducing overall training cost by approximately 4× compared to training each subset separately. While performance fluctuations remain unavoidable, joint training generally produces optimal or near-optimal results.
+
+**(6)**
+We acknowledge that one limitation of CogVLA is that some degree of performance variation is unavoidable. For this reason, Appendix A explicitly states that evaluations are conducted every 10k steps and that the best-performing checkpoint is reported.
+
+Our analysis suggests that this phenomenon is closely related to the routing mechanisms employed by CogVLA. Specifically:
+
+* EFA-Routing aggregates visual tokens conditioned on task instructions during visual encoding.
+* LFP-Routing further prunes visual tokens inside the language model according to task relevance.
+
+Ultimately, only approximately 1/8 of the original visual tokens are retained, representing an intentional trade-off between computational efficiency and robustness.
+
+During token pruning, some router scores may lie extremely close to the pruning threshold. Under such circumstances, minor numerical differences introduced by random seeds, GPU architectures, BF16 rounding behavior, attention kernel implementations, or low-level CUDA operations may alter whether a token is retained or discarded. For example, a routing score of 0.50001 may be retained, whereas 0.49999 may be pruned. Although the numerical difference is negligible, the resulting token set may differ, potentially propagating through the model and causing measurable variations in final task success rates. Therefore, they reflect the increased sensitivity that naturally arises in aggressively sparsified VLA architectures, where small perturbations in routing decisions can lead to amplified downstream effects during long-horizon embodied decision-making.
+
+> This is my personal contact information: WeChat **runtolake**. 
+>
+> We are committed to continuously maintaining and improving this project, as well as providing more comprehensive open-source resources in future releases. If you are interested in this work, we would be very happy to stay in touch, discuss potential improvements, and work together with the community to further advance and refine the project.
+
 
 ## :fire: Citation
 
