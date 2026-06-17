@@ -34,9 +34,9 @@ School of Computer Science and Technology, Harbin Institute of Technology, Shenz
 </div>
 
 
-
 ## :fire: Updates
 
+- [06/2026] :fire: Updated the representative issue and checkpoints.
 - [09/2025] :fire: Code released. Enjoy it!
 - [09/2025] :fire: CogVLA is accepted to **NeurIPS 2025**!
 - [08/2025] :fire: [Project page](https://jiutian-vl.github.io/CogVLA-page/) released.
@@ -203,6 +203,24 @@ During token pruning, some router scores may lie extremely close to the pruning 
 > This is my personal contact information: WeChat **runtolake**. 
 >
 > We are committed to continuously maintaining and improving this project, as well as providing more comprehensive open-source resources in future releases. If you are interested in this work, we would be very happy to stay in touch, discuss potential improvements, and work together with the community to further advance and refine the project.
+
+
+## Update
+
+We evaluate the performance of CogVLA on the LIBERO benchmark using our available compute resources (8×96GB RTX Pro 6000 GPUs). We adopt a batch size of 64, and each training run of 80K steps takes approximately 32 hours. We release the following checkpoints:
+
+* LIBERO Spatial: https://huggingface.co/liwei2013/cogvla_libero_spatial_60000_chkpt
+* LIBERO Object: https://huggingface.co/liwei2013/cogvla_libero_object_70000_chkpt
+* LIBERO Goal: https://huggingface.co/liwei2013/cogvla_libero_goal_30000_chkpt
+* LIBERO Long: https://huggingface.co/liwei2013/cogvla_libero_long_70000_chkpt 
+
+For each task suite, we select the checkpoint corresponding to its best-performing training step and report results averaged over 3 evaluation runs. The success rates (mean ± standard deviation) across the four task suites are 98.5±0.1, 98.6±0.2, 97.7±0.3, and 95.0±0.6, respectively.
+
+Notably, we observe that the MuJoCo version has a significant impact on LIBERO evaluation results. For instance, on LIBERO Spatial, success rates vary from approximately 97.8, 98.6, to 95.0 under MuJoCo v2.3.7, v3.3.6, and the latest release, respectively. LIBERO Long tends to favor the older MuJoCo version (v2.3.7), which yields improvements of approximately 1-2 percentage points over newer versions.
+
+We hypothesize that this variance may stem from: (1) discrepancies between the MuJoCo rendering environment used during LIBERO data collection and current simulation engines, (2) stochasticity introduced by token compression and pruning mechanisms in CogVLA, and (3) differences in model robustness under varying rendering and physics implementations. Therefore, we recommend evaluating across multiple MuJoCo versions for more reliable benchmarking.
+
+In addition, we conduct preliminary experiments on modified training configurations. Increasing LoRA rank to r=64 with α=128 and scaling the batch size to 128 consistently leads to more stable and improved performance on LIBERO Spatial and LIBERO Long in later training stages. When additional computational resources become available, we plan to further explore optimized training configurations for CogVLA.
 
 
 ## :fire: Citation
